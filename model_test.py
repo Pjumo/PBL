@@ -13,17 +13,26 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-num_epochs = 40
+num_epochs = 30
 batch_size = 64
 
-transform = transforms.Compose([
+# augment *padding *HorizontalFlip
+transform_train = transforms.Compose([
+    transforms.RandomCrop(32, padding=4),
+    transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
-    transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5))
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+])
+
+transform_test = transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
 ])
 
 # Call CIFAR datasets
-train_dataset = datasets.CIFAR10('./train', train=True, transform=transform, download=True)
-test_dataset = datasets.CIFAR10('./test', train=False, transform=transform, download=True)
+train_dataset = datasets.CIFAR10('./train', train=True, transform=transform_train, download=True)
+val_dataset = datasets.CIFAR10('./train', train=True, transform=transform_test, download=True)
+test_dataset = datasets.CIFAR10('./test', train=False, transform=transform_test, download=True)
 
 # Split train datasets for validation datasets
 num_train = len(train_dataset)
@@ -37,21 +46,17 @@ train_sampler = SubsetRandomSampler(train_idx)
 
 # Create DataLoader (split by batch size)
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, sampler=train_sampler)
-val_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, sampler=val_sampler)
+val_loader = torch.utils.data.DataLoader(dataset=val_dataset, batch_size=batch_size, sampler=val_sampler)
 test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch_size, shuffle=False)
 
-cnt_progress = len(train_loader)//30
+cnt_progress = len(train_loader) // 30
 
-model_name = 'resnet18'
+model_name = 'resnet34'
 model = model_loader.load(model_name, num_class=10).to(device)
 
-optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
 loss_func = nn.CrossEntropyLoss()
-scheduler = torch.optim.lr_scheduler.MultiStepLR(
-    optimizer=optimizer,
-    milestones=[20, 30],
-    gamma=0.1
-)
+scheduler = torch.optim.lr_scheduler.StepLR(optimizer=optimizer, step_size=10, gamma=0.1)
 
 best_val_loss = float('Inf')
 train_loss = []
@@ -147,12 +152,12 @@ plt.plot(val_loss)
 plt.title('model loss')
 plt.xlabel('epoch')
 plt.ylabel('loss')
-plt.ylim(0, 100)
+plt.ylim(0, 2)
 plt.legend(['train', 'validation'], loc='upper left')
 # plot Acc Graph
 plt.subplot(2, 1, 2)
-plt.plot(train_acc)
-plt.plot(val_acc)
+plt.plot(np.array(train_acc) * 100)
+plt.plot(np.array(val_acc) * 100)
 plt.title('model acc')
 plt.xlabel('epoch')
 plt.ylabel('accuracy')
@@ -160,8 +165,7 @@ plt.ylim(0, 100)
 plt.legend(['train', 'validation'], loc='upper left')
 
 plt.tight_layout()
-plt.show()
-plt.savefig(f'graphs/{model_name}_base.png')
+plt.savefig(f'graphs/{model_name}_residual.png')
 
 model = model.to("cpu")
 torch.cuda.empty_cache()

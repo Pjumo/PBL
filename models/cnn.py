@@ -17,23 +17,15 @@ class ResidualBlock(nn.Module):  # ResNet을 구성하는 Residual Block 구조 
             nn.BatchNorm2d(self.out_channels)
         )
 
-        if self.stride != 1 or self.in_channels != self.out_channels:
-            self.down_sample = nn.Sequential(
-                nn.Conv2d(self.in_channels, self.out_channels, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.out_channels)
-            )
-
     def forward(self, x):
         out = self.conv_block(x)
-        if self.stride != 1 or self.in_channels != self.out_channels:
-            x = self.down_sample(x)
-        out = F.relu(x + out)
+        out = F.relu(out)
         return out
 
 
-class ResNet(nn.Module):
+class CNN(nn.Module):
     def __init__(self, num_blocks, num_classes=10):
-        super(ResNet, self).__init__()
+        super(CNN, self).__init__()
         self.in_channels = 64
         self.base = nn.Sequential(
             nn.Conv2d(3, self.in_channels, kernel_size=3, stride=1, padding=1, bias=False),
@@ -46,7 +38,7 @@ class ResNet(nn.Module):
         self.layer3 = self.make_layer(256, num_blocks[2], stride=2)
         self.layer4 = self.make_layer(512, num_blocks[3], stride=2)
 
-        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(512, num_classes)
 
     def make_layer(self, out_channels, num_block, stride):
@@ -72,9 +64,9 @@ class ResNet(nn.Module):
         return out
 
 
-def ResNet18(num_classes):
-    return ResNet([2, 2, 2, 2], num_classes)
+def CNN18(num_classes):
+    return CNN([2, 2, 2, 2], num_classes)
 
 
-def ResNet34(num_classes):
-    return ResNet([3, 4, 6, 3], num_classes)
+def CNN34(num_classes):
+    return CNN([3, 4, 6, 3], num_classes)
