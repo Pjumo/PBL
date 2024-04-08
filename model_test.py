@@ -1,6 +1,7 @@
 # for CIFAR-10, CIFAR-100
 
 import numpy as np
+import matplotlib.pyplot as plt
 import model_loader
 
 import torch
@@ -12,8 +13,8 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-num_epochs = 10
-batch_size = 32
+num_epochs = 40
+batch_size = 64
 
 transform = transforms.Compose([
     transforms.ToTensor(),
@@ -29,10 +30,10 @@ num_train = len(train_dataset)
 indices = list(range(num_train))
 split = int(np.floor(0.2 * num_train))
 train_idx, val_idx = indices[split:], indices[:split]
-np.random.shuffle(indices)
 
-train_sampler = SubsetRandomSampler(train_idx)
 val_sampler = SubsetRandomSampler(val_idx)
+np.random.shuffle(indices)
+train_sampler = SubsetRandomSampler(train_idx)
 
 # Create DataLoader (split by batch size)
 train_loader = torch.utils.data.DataLoader(dataset=train_dataset, batch_size=batch_size, sampler=train_sampler)
@@ -41,16 +42,22 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch
 
 cnt_progress = len(train_loader)//30
 
-model = model_loader.load('resnet18', num_class=10).to(device)
+model_name = 'resnet18'
+model = model_loader.load(model_name, num_class=10).to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
+optimizer = torch.optim.SGD(model.parameters(), lr=0.1, momentum=0.9, weight_decay=1e-4)
 loss_func = nn.CrossEntropyLoss()
-scheduler = torch.optim.lr_scheduler.LambdaLR(
+scheduler = torch.optim.lr_scheduler.MultiStepLR(
     optimizer=optimizer,
-    lr_lambda=lambda epoch_: 0.95 ** epoch_,
-    last_epoch=-1)
+    milestones=[20, 30],
+    gamma=0.1
+)
 
 best_val_loss = float('Inf')
+train_loss = []
+val_loss = []
+train_acc = []
+val_acc = []
 for epoch in range(num_epochs):
     model.train()
     total_train_acc = 0
@@ -68,6 +75,7 @@ for epoch in range(num_epochs):
 
         total_train_acc += (predict.argmax(1) == labels).float().mean().item()
         total_train_loss += loss.item()
+        # progress bar 구현
         if cnt % cnt_progress == 0:
             print(f'\rEpoch {epoch + 1} [', end='')
             for prog in range(cnt // cnt_progress):
@@ -78,6 +86,8 @@ for epoch in range(num_epochs):
 
     total_train_loss /= len(train_loader)
     total_train_acc /= len(train_loader)
+    train_loss.append(total_train_loss)
+    train_acc.append(total_train_acc)
     print(f' - Train Loss: {total_train_loss:.4f}, Train Acc: {total_train_acc:.4f}')
 
     model.eval()  # 모델을 평가 모드로 설정
@@ -97,6 +107,8 @@ for epoch in range(num_epochs):
         total_val_loss /= len(val_loader)
         total_val_acc /= len(val_loader)
 
+    val_loss.append(total_val_loss)
+    val_acc.append(total_val_acc)
     print(f'Validation Loss: {total_val_loss:.4f}, Validation Acc: {total_val_acc:.4f}')
 
     if total_val_loss < best_val_loss:
@@ -127,6 +139,29 @@ with torch.no_grad():
     total_test_acc /= len(test_loader)
 
 print(f'Test Loss: {total_test_loss:.4f}, Test Acc: {total_test_acc:.4f}')
+
+# plot Loss Graph
+plt.subplot(2, 1, 1)
+plt.plot(train_loss)
+plt.plot(val_loss)
+plt.title('model loss')
+plt.xlabel('epoch')
+plt.ylabel('loss')
+plt.ylim(0, 100)
+plt.legend(['train', 'validation'], loc='upper left')
+# plot Acc Graph
+plt.subplot(2, 1, 2)
+plt.plot(train_acc)
+plt.plot(val_acc)
+plt.title('model acc')
+plt.xlabel('epoch')
+plt.ylabel('accuracy')
+plt.ylim(0, 100)
+plt.legend(['train', 'validation'], loc='upper left')
+
+plt.tight_layout()
+plt.show()
+plt.savefig(f'graphs/{model_name}_base.png')
 
 model = model.to("cpu")
 torch.cuda.empty_cache()
