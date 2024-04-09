@@ -2,9 +2,10 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-class u2net(nn.Module):
-    def __init__(self, in_channels = 3, out_channels = 1, num_classes = 10):
-        super(u2net, self).__init__()
+
+class U2Net(nn.Module):
+    def __init__(self, in_channels=3, out_channels=1, num_class=10):
+        super(U2Net, self).__init__()
         self.encoder = nn.Sequential(
             nn.Conv2d(in_channels, 64, kernel_size=3, padding=1),
             nn.ReLU(inplace=True),
@@ -60,10 +61,17 @@ class u2net(nn.Module):
             nn.Conv2d(64, out_channels, kernel_size=1)
         )
 
+        self.fc = nn.Sequential(
+            nn.Flatten(),
+            nn.Linear(1024, num_class)
+        )
+
     def forward(self, x):
         x = self.encoder(x)
         x = self.decoder(x)
+        x = self.fc(x)
         return torch.sigmoid(x)
 
+
 def u2net_caller(num_classes):
-    return u2net(num_classes = num_classes)
+    return U2Net(num_class=num_classes)
