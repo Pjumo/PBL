@@ -51,7 +51,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch
 
 cnt_progress = len(train_loader) // 30
 
-model_name = 'resnet34'
+model_name = 'preact_resnet50'
 model = model_loader.load(model_name, num_class=10).to(device)
 
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)

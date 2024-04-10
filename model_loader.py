@@ -7,6 +7,14 @@ models = {
     'cnn34': cnn.CNN34,
     'resnet18': resnet.ResNet18,
     'resnet34': resnet.ResNet34,
+    'resnet50': resnet.ResNet50,
+    'resnet101': resnet.ResNet101,
+    'resnet152': resnet.ResNet152,
+    'preact_resnet18': resnet.PreActResNet18,
+    'preact_resnet34': resnet.PreActResNet34,
+    'preact_resnet50': resnet.PreActResNet50,
+    'preact_resnet101': resnet.PreActResNet101,
+    'preact_resnet152': resnet.PreActResNet152,
     'u2net': u2net.u2net_caller  # µ2Net 모델 추가
 }
 
