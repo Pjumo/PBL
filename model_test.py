@@ -13,7 +13,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-num_epochs = 2
+num_epochs = 30
 batch_size = 64
 
 # augment *padding *HorizontalFlip
@@ -22,11 +22,14 @@ transform_train = transforms.Compose([
     transforms.RandomHorizontalFlip(),
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # CIFAR-100 (0.5074, 0.4867, 0.4411), (0.2011, 0.1987, 0.2025)
+    # transforms.Resize(224, 224)
 ])
 
 transform_test = transforms.Compose([
     transforms.ToTensor(),
     transforms.Normalize((0.4914, 0.4822, 0.4465), (0.2023, 0.1994, 0.2010))
+    # transforms.Resize(224, 224)
 ])
 
 # Call CIFAR datasets
@@ -51,7 +54,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch
 
 cnt_progress = len(train_loader) // 30
 
-model_name = 'wide_resnet34'
+model_name = 'u2net'
 model = model_loader.load(model_name, num_class=10).to(device)
 
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)

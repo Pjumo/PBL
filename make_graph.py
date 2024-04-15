@@ -16,10 +16,11 @@ plt.xlabel('epoch')
 plt.ylabel('loss')
 plt.ylim(0, 2)
 plt.legend(['train', 'validation'], loc='upper left')
+
 # plot Acc Graph
 plt.subplot(2, 1, 2)
-plt.plot(np.array(train_acc) * 100)
-plt.plot(np.array(val_acc) * 100)
+plt.plot(train_acc * 100)
+plt.plot(val_acc * 100)
 plt.title('model acc')
 plt.xlabel('epoch')
 plt.ylabel('accuracy')

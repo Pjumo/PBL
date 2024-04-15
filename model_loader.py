@@ -18,7 +18,6 @@ models = {
     'preact_resnet18': resnet.PreActResNet18,
     'preact_resnet34': resnet.PreActResNet34,
     'preact_resnet50': resnet.PreActResNet50,
-
     'preact_resnet101': resnet.PreActResNet101,
     'preact_resnet152': resnet.PreActResNet152,
 
