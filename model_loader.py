@@ -1,4 +1,5 @@
 import models.resnet as resnet
+import models.wide_resnet as wide_resnet
 import models.cnn as cnn
 import models.u2net as u2net  # µ2Net 모델을 불러오기 위한 import 문 추가
 import models.effnet as effnet
@@ -20,6 +21,8 @@ models = {
 
     'preact_resnet101': resnet.PreActResNet101,
     'preact_resnet152': resnet.PreActResNet152,
+
+    'wide_resnet34': wide_resnet.WideResNet34,
 
     'u2net': u2net.u2net_caller,
 

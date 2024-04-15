@@ -13,7 +13,7 @@ from torch.utils.data.sampler import SubsetRandomSampler
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
-num_epochs = 30
+num_epochs = 2
 batch_size = 64
 
 # augment *padding *HorizontalFlip
@@ -51,7 +51,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch
 
 cnt_progress = len(train_loader) // 30
 
-model_name = 'resnet18'
+model_name = 'wide_resnet34'
 model = model_loader.load(model_name, num_class=10).to(device)
 
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
@@ -149,11 +149,14 @@ train_loss = np.array(train_loss)  # 각 모델의 loss, acc 정보를 저장 (�
 train_acc = np.array(train_acc)
 val_loss = np.array(val_loss)
 val_acc = np.array(val_acc)
+test_result = np.array([total_test_loss, total_test_acc, num_epochs])
+
 os.makedirs(f'result_numpy/{model_name}', exist_ok=True)
 np.save(os.path.join(f'result_numpy/{model_name}/train_loss'), train_loss)
 np.save(os.path.join(f'result_numpy/{model_name}/train_acc'), train_acc)
 np.save(os.path.join(f'result_numpy/{model_name}/val_loss'), val_loss)
 np.save(os.path.join(f'result_numpy/{model_name}/val_acc'), val_acc)
+np.save(os.path.join(f'result_numpy/{model_name}/test_result'), test_result)
 
 model = model.to("cpu")
 torch.cuda.empty_cache()
