@@ -66,6 +66,7 @@ train_loss = []
 val_loss = []
 train_acc = []
 val_acc = []
+recent_val_loss = 100
 for epoch in range(num_epochs):
     model.train()
     total_train_acc = 0
@@ -101,6 +102,7 @@ for epoch in range(num_epochs):
     model.eval()  # 모델을 평가 모드로 설정
     total_val_acc = 0
     total_val_loss = 0
+    num_loss = 0
     with torch.no_grad():
         for images_, labels_ in val_loader:
             images = images_.to(device)
@@ -120,8 +122,14 @@ for epoch in range(num_epochs):
     print(f'Validation Loss: {total_val_loss:.4f}, Validation Acc: {total_val_acc:.4f}')
 
     if total_val_loss < best_val_loss:
+        num_loss = 0
         best_val_loss = total_val_loss
         torch.save(model.state_dict(), 'best_model.pt')
+    else:
+        num_loss += 1
+        if num_loss == 5:
+            print(f'early stopping: epoch {epoch}')
+            break
 
     scheduler.step()
 
