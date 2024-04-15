@@ -4,12 +4,13 @@ import torch.nn.functional as F
 from torchsummary import summary
 from torch import optim
 
+
 # SE Block
 class SEBlock(nn.Module):
     def __init__(self, in_channels, r=4):
         super().__init__()
 
-        self.squeeze = nn.AdaptiveAvgPool2d((1,1))
+        self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
         self.excitation = nn.Sequential(
             nn.Linear(in_channels, in_channels * r),
             nn.SiLU(),
@@ -24,8 +25,10 @@ class SEBlock(nn.Module):
         x = x.view(x.size(0), x.size(1), 1, 1)
         return x
 
+
 class MBConv(nn.Module):
     expand = 6
+
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, se_scale=4, p=0.5):
         super().__init__()
         # first MBConv is not using stochastic depth
@@ -36,7 +39,7 @@ class MBConv(nn.Module):
             nn.BatchNorm2d(in_channels * MBConv.expand, momentum=0.99, eps=1e-3),
             nn.SiLU(),
             nn.Conv2d(in_channels * MBConv.expand, in_channels * MBConv.expand, kernel_size=kernel_size,
-                      stride=1, padding=kernel_size//2, bias=False, groups=in_channels*MBConv.expand),
+                      stride=1, padding=kernel_size // 2, bias=False, groups=in_channels * MBConv.expand),
             nn.BatchNorm2d(in_channels * MBConv.expand, momentum=0.99, eps=1e-3),
             nn.SiLU()
         )
@@ -44,7 +47,7 @@ class MBConv(nn.Module):
         self.se = SEBlock(in_channels * MBConv.expand, se_scale)
 
         self.project = nn.Sequential(
-            nn.Conv2d(in_channels*MBConv.expand, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.Conv2d(in_channels * MBConv.expand, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
             nn.BatchNorm2d(out_channels, momentum=0.99, eps=1e-3)
         )
 
@@ -64,13 +67,14 @@ class MBConv(nn.Module):
         x = self.project(x)
 
         if self.shortcut:
-            x= x_shortcut + x
+            x = x_shortcut + x
 
         return x
 
 
 class SepConv(nn.Module):
     expand = 1
+
     def __init__(self, in_channels, out_channels, kernel_size, stride=1, se_scale=4, p=0.5):
         super().__init__()
         # first SepConv is not using stochastic depth
@@ -78,7 +82,7 @@ class SepConv(nn.Module):
 
         self.residual = nn.Sequential(
             nn.Conv2d(in_channels * SepConv.expand, in_channels * SepConv.expand, kernel_size=kernel_size,
-                      stride=1, padding=kernel_size//2, bias=False, groups=in_channels*SepConv.expand),
+                      stride=1, padding=kernel_size // 2, bias=False, groups=in_channels * SepConv.expand),
             nn.BatchNorm2d(in_channels * SepConv.expand, momentum=0.99, eps=1e-3),
             nn.SiLU()
         )
@@ -86,7 +90,7 @@ class SepConv(nn.Module):
         self.se = SEBlock(in_channels * SepConv.expand, se_scale)
 
         self.project = nn.Sequential(
-            nn.Conv2d(in_channels*SepConv.expand, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.Conv2d(in_channels * SepConv.expand, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
             nn.BatchNorm2d(out_channels, momentum=0.99, eps=1e-3)
         )
 
@@ -106,9 +110,10 @@ class SepConv(nn.Module):
         x = self.project(x)
 
         if self.shortcut:
-            x= x_shortcut + x
+            x = x_shortcut + x
 
         return x
+
 
 class EfficientNet(nn.Module):
     def __init__(self, num_classes, width, depth, scale, dropout, se_scale, stochastic_depth=False, p=0.5):
@@ -118,8 +123,8 @@ class EfficientNet(nn.Module):
         kernel_size = [3, 3, 5, 3, 5, 5, 3]
         strides = [1, 2, 2, 2, 1, 2, 1]
 
-        channels = [int(x*width) for x in channels]
-        repeats = [int(x*depth) for x in repeats]
+        channels = [int(x * width) for x in channels]
+        repeats = [int(x * depth) for x in repeats]
 
         # stochastic depth
         if stochastic_depth:
@@ -129,36 +134,42 @@ class EfficientNet(nn.Module):
             self.p = 1
             self.step = 0
 
-
         # efficient net
         self.upsample = nn.Upsample(scale_factor=scale, mode='bilinear', align_corners=False)
 
         self.stage1 = nn.Sequential(
-            nn.Conv2d(3, channels[0],3, stride=2, padding=1, bias=False),
+            nn.Conv2d(3, channels[0], 3, stride=2, padding=1, bias=False),
             nn.BatchNorm2d(channels[0], momentum=0.99, eps=1e-3)
         )
 
-        self.stage2 = self._make_Block(SepConv, repeats[0], channels[0], channels[1], kernel_size[0], strides[0], se_scale)
+        self.stage2 = self._make_Block(SepConv, repeats[0], channels[0], channels[1], kernel_size[0], strides[0],
+                                       se_scale)
 
-        self.stage3 = self._make_Block(MBConv, repeats[1], channels[1], channels[2], kernel_size[1], strides[1], se_scale)
+        self.stage3 = self._make_Block(MBConv, repeats[1], channels[1], channels[2], kernel_size[1], strides[1],
+                                       se_scale)
 
-        self.stage4 = self._make_Block(MBConv, repeats[2], channels[2], channels[3], kernel_size[2], strides[2], se_scale)
+        self.stage4 = self._make_Block(MBConv, repeats[2], channels[2], channels[3], kernel_size[2], strides[2],
+                                       se_scale)
 
-        self.stage5 = self._make_Block(MBConv, repeats[3], channels[3], channels[4], kernel_size[3], strides[3], se_scale)
+        self.stage5 = self._make_Block(MBConv, repeats[3], channels[3], channels[4], kernel_size[3], strides[3],
+                                       se_scale)
 
-        self.stage6 = self._make_Block(MBConv, repeats[4], channels[4], channels[5], kernel_size[4], strides[4], se_scale)
+        self.stage6 = self._make_Block(MBConv, repeats[4], channels[4], channels[5], kernel_size[4], strides[4],
+                                       se_scale)
 
-        self.stage7 = self._make_Block(MBConv, repeats[5], channels[5], channels[6], kernel_size[5], strides[5], se_scale)
+        self.stage7 = self._make_Block(MBConv, repeats[5], channels[5], channels[6], kernel_size[5], strides[5],
+                                       se_scale)
 
-        self.stage8 = self._make_Block(MBConv, repeats[6], channels[6], channels[7], kernel_size[6], strides[6], se_scale)
+        self.stage8 = self._make_Block(MBConv, repeats[6], channels[6], channels[7], kernel_size[6], strides[6],
+                                       se_scale)
 
         self.stage9 = nn.Sequential(
             nn.Conv2d(channels[7], channels[8], 1, stride=1, bias=False),
             nn.BatchNorm2d(channels[8], momentum=0.99, eps=1e-3),
             nn.SiLU()
-        ) 
+        )
 
-        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.dropout = nn.Dropout(p=dropout)
         self.linear = nn.Linear(channels[8], num_classes)
 
@@ -179,7 +190,6 @@ class EfficientNet(nn.Module):
         x = self.linear(x)
         return x
 
-
     def _make_Block(self, block, repeats, in_channels, out_channels, kernel_size, stride, se_scale):
         strides = [stride] + [1] * (repeats - 1)
         layers = []
@@ -192,27 +202,32 @@ class EfficientNet(nn.Module):
 
 
 def efficientnet_b0(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.0, depth=1.0, scale=1.0,dropout=0.2, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.0, depth=1.0, scale=1.0, dropout=0.2, se_scale=4)
+
 
 def efficientnet_b1(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.0, depth=1.1, scale=240/224, dropout=0.2, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.0, depth=1.1, scale=240 / 224, dropout=0.2, se_scale=4)
+
 
 def efficientnet_b2(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.1, depth=1.2, scale=260/224., dropout=0.3, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.1, depth=1.2, scale=260 / 224., dropout=0.3, se_scale=4)
+
 
 def efficientnet_b3(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.2, depth=1.4, scale=300/224, dropout=0.3, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.2, depth=1.4, scale=300 / 224, dropout=0.3, se_scale=4)
+
 
 def efficientnet_b4(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.4, depth=1.8, scale=380/224, dropout=0.4, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.4, depth=1.8, scale=380 / 224, dropout=0.4, se_scale=4)
+
 
 def efficientnet_b5(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.6, depth=2.2, scale=456/224, dropout=0.4, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.6, depth=2.2, scale=456 / 224, dropout=0.4, se_scale=4)
+
 
 def efficientnet_b6(num_classes):
-    return EfficientNet(num_classes=num_classes, width=1.8, depth=2.6, scale=528/224, dropout=0.5, se_scale=4)
+    return EfficientNet(num_classes=num_classes, width=1.8, depth=2.6, scale=528 / 224, dropout=0.5, se_scale=4)
+
 
 def efficientnet_b7(num_classes):
-    return EfficientNet(num_classes=num_classes, width=2.0, depth=3.1, scale=600/224, dropout=0.5, se_scale=4)
-
-
+    return EfficientNet(num_classes=num_classes, width=2.0, depth=3.1, scale=600 / 224, dropout=0.5, se_scale=4)

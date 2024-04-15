@@ -1,7 +1,7 @@
 # for CIFAR-10, CIFAR-100
 
 import numpy as np
-import matplotlib.pyplot as plt
+import os
 import model_loader
 
 import torch
@@ -51,7 +51,7 @@ test_loader = torch.utils.data.DataLoader(dataset=test_dataset, batch_size=batch
 
 cnt_progress = len(train_loader) // 30
 
-model_name = 'preact_resnet50'
+model_name = 'resnet18'
 model = model_loader.load(model_name, num_class=10).to(device)
 
 optimizer = torch.optim.SGD(model.parameters(), lr=0.01, momentum=0.9, weight_decay=1e-4)
@@ -145,27 +145,15 @@ with torch.no_grad():
 
 print(f'Test Loss: {total_test_loss:.4f}, Test Acc: {total_test_acc:.4f}')
 
-# plot Loss Graph
-plt.subplot(2, 1, 1)
-plt.plot(train_loss)
-plt.plot(val_loss)
-plt.title('model loss')
-plt.xlabel('epoch')
-plt.ylabel('loss')
-plt.ylim(0, 2)
-plt.legend(['train', 'validation'], loc='upper left')
-# plot Acc Graph
-plt.subplot(2, 1, 2)
-plt.plot(np.array(train_acc) * 100)
-plt.plot(np.array(val_acc) * 100)
-plt.title('model acc')
-plt.xlabel('epoch')
-plt.ylabel('accuracy')
-plt.ylim(0, 100)
-plt.legend(['train', 'validation'], loc='upper left')
-
-plt.tight_layout()
-plt.savefig(f'graphs/{model_name}_residual.png')
+train_loss = np.array(train_loss)  # 각 모델의 loss, acc 정보를 저장 (추후 그래프를 위함)
+train_acc = np.array(train_acc)
+val_loss = np.array(val_loss)
+val_acc = np.array(val_acc)
+os.makedirs(f'result_numpy/{model_name}', exist_ok=True)
+np.save(os.path.join(f'result_numpy/{model_name}/train_loss'), train_loss)
+np.save(os.path.join(f'result_numpy/{model_name}/train_acc'), train_acc)
+np.save(os.path.join(f'result_numpy/{model_name}/val_loss'), val_loss)
+np.save(os.path.join(f'result_numpy/{model_name}/val_acc'), val_acc)
 
 model = model.to("cpu")
 torch.cuda.empty_cache()
