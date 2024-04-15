@@ -4,16 +4,6 @@ import torch.nn.functional as F
 from torchsummary import summary
 from torch import optim
 
-
-# Swish activation function
-class Swish(nn.Module):
-    def __init__(self):
-        super().__init__()
-        self.sigmoid = nn.Sigmoid()
-
-    def forward(self, x):
-        return x * self.sigmoid(x)
-
 # SE Block
 class SEBlock(nn.Module):
     def __init__(self, in_channels, r=4):
@@ -22,7 +12,7 @@ class SEBlock(nn.Module):
         self.squeeze = nn.AdaptiveAvgPool2d((1,1))
         self.excitation = nn.Sequential(
             nn.Linear(in_channels, in_channels * r),
-            Swish(),
+            nn.SiLU(),
             nn.Linear(in_channels * r, in_channels),
             nn.Sigmoid()
         )
@@ -34,101 +24,50 @@ class SEBlock(nn.Module):
         x = x.view(x.size(0), x.size(1), 1, 1)
         return x
 
-# class MBConv(nn.Module):
-#     expand = 6
-#     def __init__(self, in_channels, out_channels, kernel_size, stride=1, se_scale=4, p=0.5):
-#         super().__init__()
-#         # first MBConv is not using stochastic depth
-#         self.p = torch.tensor(p).float() if (in_channels == out_channels) else torch.tensor(1).float()
+class MBConv(nn.Module):
+    expand = 6
+    def __init__(self, in_channels, out_channels, kernel_size, stride=1, se_scale=4, p=0.5):
+        super().__init__()
+        # first MBConv is not using stochastic depth
+        self.p = torch.tensor(p).float() if (in_channels == out_channels) else torch.tensor(1).float()
 
-#         self.residual = nn.Sequential(
-#             nn.Conv2d(in_channels, in_channels * MBConv.expand, 1, stride=stride, padding=0, bias=False),
-#             nn.BatchNorm2d(in_channels * MBConv.expand, momentum=0.99, eps=1e-3),
-#             Swish(),
-#             nn.Conv2d(in_channels * MBConv.expand, in_channels * MBConv.expand, kernel_size=kernel_size,
-#                       stride=1, padding=kernel_size//2, bias=False, groups=in_channels*MBConv.expand),
-#             nn.BatchNorm2d(in_channels * MBConv.expand, momentum=0.99, eps=1e-3),
-#             Swish()
-#         )
+        self.residual = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels * MBConv.expand, 1, stride=stride, padding=0, bias=False),
+            nn.BatchNorm2d(in_channels * MBConv.expand, momentum=0.99, eps=1e-3),
+            nn.SiLU(),
+            nn.Conv2d(in_channels * MBConv.expand, in_channels * MBConv.expand, kernel_size=kernel_size,
+                      stride=1, padding=kernel_size//2, bias=False, groups=in_channels*MBConv.expand),
+            nn.BatchNorm2d(in_channels * MBConv.expand, momentum=0.99, eps=1e-3),
+            nn.SiLU()
+        )
 
-#         self.se = SEBlock(in_channels * MBConv.expand, se_scale)
+        self.se = SEBlock(in_channels * MBConv.expand, se_scale)
 
-#         self.project = nn.Sequential(
-#             nn.Conv2d(in_channels*MBConv.expand, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
-#             nn.BatchNorm2d(out_channels, momentum=0.99, eps=1e-3)
-#         )
+        self.project = nn.Sequential(
+            nn.Conv2d(in_channels*MBConv.expand, out_channels, kernel_size=1, stride=1, padding=0, bias=False),
+            nn.BatchNorm2d(out_channels, momentum=0.99, eps=1e-3)
+        )
 
-#         self.shortcut = (stride == 1) and (in_channels == out_channels)
+        self.shortcut = (stride == 1) and (in_channels == out_channels)
 
-#     def forward(self, x):
-#         # stochastic depth
-#         if self.training:
-#             if not torch.bernoulli(self.p):
-#                 return x
+    def forward(self, x):
+        # stochastic depth
+        if self.training:
+            if not torch.bernoulli(self.p):
+                return x
 
-#         x_shortcut = x
-#         x_residual = self.residual(x)
-#         x_se = self.se(x_residual)
+        x_shortcut = x
+        x_residual = self.residual(x)
+        x_se = self.se(x_residual)
 
-#         x = x_se * x_residual
-#         x = self.project(x)
+        x = x_se * x_residual
+        x = self.project(x)
 
-#         if self.shortcut:
-#             x= x_shortcut + x
+        if self.shortcut:
+            x= x_shortcut + x
 
-#         return x
+        return x
 
-# class MBConv(nn.Module):
-#     def __init__(self, in_channels, out_channels, expand, kernel_size, stride=1, r=0.25, dropout_rate=0.2, bias=True):
-#         super().__init__()
-        
-#         # 변수 설정
-#         self.dropout_rate = dropout_rate
-#         self.expand = expand
-        
-#         # skip connection 사용을 위한 조건 지정
-#         self.use_residual = in_channels == out_channels and stride == 1
-
-#         # 논문에서 수행한 BatchNorm, SiLU 적용
-#         # stage1. Expansion
-#         expand_channels = in_channels*expand
-#         self.expansion = nn.Sequential(nn.Conv2d(in_channels, expand_channels, 1, bias=False),
-#                                        nn.BatchNorm2d(expand_channels, momentum=0.99),
-#                                        nn.SiLU(),
-#                                       )
-#         # stage2. Depth-wise convolution
-#         self.depth_wise = nn.Sequential(nn.Conv2d(expand_channels, expand_channels, kernel_size=kernel_size, stride=1, padding=1, groups=expand_channels),
-#                                         nn.BatchNorm2d(expand_channels, momentum=0.99),
-#                                         nn.SiLU(),
-#                                        )
-#         # stage3. Squeeze and Excitation
-#         self.se_block = SEBlock(expand_channels, r)
-#         # stage4. Point-wise convolution
-#         self.point_wise = nn.Sequential(nn.Conv2d(expand_channels, out_channels, 1, 1, bias=False),
-#                                         nn.BatchNorm2d(out_channels, momentum=0.99)
-#                                        )
-#     def forward(self, x):
-#         # stage1
-#         if self.expand != 1:
-#             x = self.expansion(x)
-        
-#         # stage2
-#         x = self.depth_wise(x)
-#         # stage3
-#         x = self.se_block(x)
-#         # stage4
-#         x = self.point_wise(x)
-                
-#         # stage5 skip connection
-#         res = x
-        
-#         if self.use_residual:
-#             if self.training and (self.dropout_rate is not None):
-#                 x = F.dropout2d(input=x, p=self.dropout_rate, training=self.training, inplace=True)
-            
-#             x = x + res
-            
-#         return x
 
 class SepConv(nn.Module):
     expand = 1
@@ -141,7 +80,7 @@ class SepConv(nn.Module):
             nn.Conv2d(in_channels * SepConv.expand, in_channels * SepConv.expand, kernel_size=kernel_size,
                       stride=1, padding=kernel_size//2, bias=False, groups=in_channels*SepConv.expand),
             nn.BatchNorm2d(in_channels * SepConv.expand, momentum=0.99, eps=1e-3),
-            Swish()
+            nn.SiLU()
         )
 
         self.se = SEBlock(in_channels * SepConv.expand, se_scale)
@@ -170,8 +109,6 @@ class SepConv(nn.Module):
             x= x_shortcut + x
 
         return x
-
-
 
 class EfficientNet(nn.Module):
     def __init__(self, num_classes, width, depth, scale, dropout, se_scale, stochastic_depth=False, p=0.5):
@@ -218,7 +155,7 @@ class EfficientNet(nn.Module):
         self.stage9 = nn.Sequential(
             nn.Conv2d(channels[7], channels[8], 1, stride=1, bias=False),
             nn.BatchNorm2d(channels[8], momentum=0.99, eps=1e-3),
-            Swish()
+            nn.SiLU()
         ) 
 
         self.avgpool = nn.AdaptiveAvgPool2d((1,1))
