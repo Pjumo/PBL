@@ -5,6 +5,8 @@ from collections import OrderedDict
 import torch
 from torch import nn
 
+from .pretrained_weight_loader import load_from_zoo
+
 # Convolution-Normalization-Activation Module
 class ConvBNAct(nn.Sequential):
 
@@ -16,41 +18,41 @@ class ConvBNAct(nn.Sequential):
         )
 
 # Squeeze-Excitation Unit
-# class SEUnit(nn.Module):
-  
-#     def __init__(self, in_channel, reduction_ratio=4, act1=partial(nn.SiLU, inplace=True), act2=nn.Sigmoid):
-#         super(SEUnit, self).__init__()
-#         hidden_dim = in_channel // reduction_ratio
-#         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
-#         self.fc1 = nn.Conv2d(in_channel, hidden_dim, (1, 1), bias=True)
-#         self.fc2 = nn.Conv2d(hidden_dim, in_channel, (1, 1), bias=True)
-#         self.act1 = act1()
-#         self.act2 = act2()
-
-#     def forward(self, x):
-#         return x * self.act2(self.fc2(self.act1(self.fc1(self.avg_pool(x)))))
-
 class SEUnit(nn.Module):
-    def __init__(self, in_channels, reduction_ratio=16):
+  
+    def __init__(self, in_channel, reduction_ratio=4, act1=partial(nn.SiLU, inplace=True), act2=nn.Sigmoid):
         super(SEUnit, self).__init__()
-        # Squeeze 부분
-        self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
-        # Excitation 부분
-        self.excitation = nn.Sequential(
-            nn.Linear(in_channels, in_channels // reduction_ratio),  # 줄이기
-            nn.ReLU(inplace=True),
-            nn.Linear(in_channels // reduction_ratio, in_channels),  # 원래 크기로 돌리기
-            nn.Sigmoid()  # 중요성을 0과 1 사이로 조정
-        )
+        hidden_dim = in_channel // reduction_ratio
+        self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc1 = nn.Conv2d(in_channel, hidden_dim, (1, 1), bias=True)
+        self.fc2 = nn.Conv2d(hidden_dim, in_channel, (1, 1), bias=True)
+        self.act1 = act1()
+        self.act2 = act2()
 
     def forward(self, x):
-        # Squeeze 부분: 글로벌 평균 풀링을 통해 각 채널의 요약 정보를 생성
-        x_squeeze = self.squeeze(x)
-        # Excitation 부분: 요약 정보를 기반으로 각 채널의 중요성을 조정
-        x_excitation = self.excitation(x_squeeze.view(x_squeeze.size(0), -1))
-        # 각 채널에 중요성을 적용하여 출력 생성
-        x_se = x * x_excitation.view(x.size(0), x.size(1), 1, 1)
-        return x_se
+        return x * self.act2(self.fc2(self.act1(self.fc1(self.avg_pool(x)))))
+
+# class SEUnit(nn.Module):
+#     def __init__(self, in_channels, reduction_ratio=16):
+#         super(SEUnit, self).__init__()
+#         # Squeeze 부분
+#         self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
+#         # Excitation 부분
+#         self.excitation = nn.Sequential(
+#             nn.Linear(in_channels, in_channels // reduction_ratio),  # 줄이기
+#             nn.ReLU(inplace=True),
+#             nn.Linear(in_channels // reduction_ratio, in_channels),  # 원래 크기로 돌리기
+#             nn.Sigmoid()  # 중요성을 0과 1 사이로 조정
+#         )
+
+#     def forward(self, x):
+#         # Squeeze 부분: 글로벌 평균 풀링을 통해 각 채널의 요약 정보를 생성
+#         x_squeeze = self.squeeze(x)
+#         # Excitation 부분: 요약 정보를 기반으로 각 채널의 중요성을 조정
+#         x_excitation = self.excitation(x_squeeze.view(x_squeeze.size(0), -1))
+#         # 각 채널에 중요성을 적용하여 출력 생성
+#         x_se = x * x_excitation.view(x.size(0), x.size(1), 1, 1)
+#         return x_se
 
 # StochasticDepth
 class StochasticDepth(nn.Module):
@@ -90,6 +92,7 @@ class MBConvConfig:
         divisible_channel = max(divisible, (int(new_channel + divisible / 2) // divisible) * divisible)
         divisible_channel += divisible if divisible_channel < 0.9 * new_channel else 0
         return divisible_channel
+    
 # EfficientNet main building blocks
 class MBConv(nn.Module):
     
@@ -255,33 +258,13 @@ def get_efficientnet_v2_structure(model_name):
             (6, 3, 2, 256, 512, 32, True, False),
             (6, 3, 1, 512, 640, 8, True, False),
         ]
-    
-# def efficientnet_v2_s(num_class):
-#     model_name = 'efficientnet_v2_s'
-#     residual_config = [MBConvConfig(*layer_config) for layer_config in get_efficientnet_v2_structure(model_name)]
-#     model = EfficientNetV2(residual_config, 1280, num_class, dropout=0.1, stochastic_depth=0.2, block=MBConv, act_layer=nn.SiLU)
-#     efficientnet_v2_init(model)
-#     return model
-
-# def efficientnet_v2_m(num_class):
-#     model_name = 'efficientnet_v2_m'
-#     residual_config = [MBConvConfig(*layer_config) for layer_config in get_efficientnet_v2_structure(model_name)]
-#     model = EfficientNetV2(residual_config, 1280, num_class, dropout=0.1, stochastic_depth=0.2, block=MBConv, act_layer=nn.SiLU)
-#     efficientnet_v2_init(model)
-#     return model
-
-# def efficientnet_v2_l(num_class):
-#     model_name = 'efficientnet_v2_l'
-#     residual_config = [MBConvConfig(*layer_config) for layer_config in get_efficientnet_v2_structure(model_name)]
-#     model = EfficientNetV2(residual_config, 1280, num_class, dropout=0.1, stochastic_depth=0.2, block=MBConv, act_layer=nn.SiLU)
-#     efficientnet_v2_init(model)
-#     return model
 
 num_class = 10
 def efficientnet_v2(model_name, num_class):
     residual_config = [MBConvConfig(*layer_config) for layer_config in get_efficientnet_v2_structure(model_name)]
     model = EfficientNetV2(residual_config, 1280, num_class, dropout=0.1, stochastic_depth=0.2, block=MBConv, act_layer=nn.SiLU)
     efficientnet_v2_init(model)
+    load_from_zoo(model,model_name)
     return model
 
 def efficientnet_v2_s(num_class): 
