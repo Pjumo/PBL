@@ -53,8 +53,9 @@ class PreActBlock(nn.Module):  # Residual Basic Block Pre-Act 방식 구현
 
         if self.stride != 1 or self.in_channels != self.out_channels:
             self.down_sample = nn.Sequential(
-                nn.Conv2d(self.in_channels, self.out_channels, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.out_channels)
+                nn.BatchNorm2d(self.in_channels),
+                nn.ReLU(),
+                nn.Conv2d(self.in_channels, self.out_channels, kernel_size=1, stride=stride, bias=False)
             )
 
     def forward(self, x):
@@ -122,8 +123,9 @@ class PreActBottleneck(nn.Module):  # Residual Bottleneck Block Pre-Act 방식 �
 
         if self.stride != 1 or self.in_channels != self.out_channels * 4:
             self.down_sample = nn.Sequential(
-                nn.Conv2d(self.in_channels, self.out_channels * 4, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.out_channels * 4)
+                nn.BatchNorm2d(self.in_channels),
+                nn.ReLU(),
+                nn.Conv2d(self.in_channels, self.out_channels * 4, kernel_size=1, stride=stride, bias=False)
             )
 
     def forward(self, x):

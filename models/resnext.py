@@ -1,5 +1,4 @@
 import torch.nn as nn
-import torch.nn.functional as F
 
 
 class ResNextBottleNeck(nn.Module):
@@ -14,6 +13,8 @@ class ResNextBottleNeck(nn.Module):
 
         num_depth = int(self.expansion * out_channels / 64)  # 그룹당 채널 수(depth per group)
         self.split_block = nn.Sequential(
+            nn.BatchNorm2d(in_channels),
+            nn.ReLU(),
             nn.Conv2d(in_channels, groups * num_depth, kernel_size=1, groups=groups, bias=False),
             nn.BatchNorm2d(groups * num_depth),
             nn.ReLU(),
@@ -21,21 +22,21 @@ class ResNextBottleNeck(nn.Module):
                       bias=False),
             nn.BatchNorm2d(groups * num_depth),
             nn.ReLU(),
-            nn.Conv2d(groups * num_depth, out_channels * 4, kernel_size=1, bias=False),
-            nn.BatchNorm2d(out_channels * 4)
+            nn.Conv2d(groups * num_depth, out_channels * 4, kernel_size=1, bias=False)
         )
 
         if self.stride != 1 or self.in_channels != self.out_channels * 4:
             self.down_sample = nn.Sequential(
-                nn.Conv2d(self.in_channels, self.out_channels * 4, kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(self.out_channels * 4)
+                nn.BatchNorm2d(self.in_channels),
+                nn.ReLU(),
+                nn.Conv2d(self.in_channels, self.out_channels * 4, kernel_size=1, stride=stride, bias=False)
             )
 
     def forward(self, x):
         out = self.split_block(x)
         if self.stride != 1 or self.in_channels != self.out_channels * 4:
             x = self.down_sample(x)
-        out = F.relu(x + out)
+        out = x + out
         return out
 
 
