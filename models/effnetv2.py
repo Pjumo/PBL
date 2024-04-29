@@ -1,3 +1,5 @@
+# 출처: https://github.com/hankyul2/EfficientNetV2-pytorch
+
 import copy
 from functools import partial
 from collections import OrderedDict
@@ -5,7 +7,7 @@ from collections import OrderedDict
 import torch
 from torch import nn
 
-from .pretrained_weight_loader import load_from_zoo
+# from .pretrained_weight_loader import load_from_zoo
 
 # Convolution-Normalization-Activation Module
 class ConvBNAct(nn.Sequential):
@@ -32,29 +34,6 @@ class SEUnit(nn.Module):
     def forward(self, x):
         return x * self.act2(self.fc2(self.act1(self.fc1(self.avg_pool(x)))))
 
-# class SEUnit(nn.Module):
-#     def __init__(self, in_channels, reduction_ratio=16):
-#         super(SEUnit, self).__init__()
-#         # Squeeze 부분
-#         self.squeeze = nn.AdaptiveAvgPool2d((1, 1))
-#         # Excitation 부분
-#         self.excitation = nn.Sequential(
-#             nn.Linear(in_channels, in_channels // reduction_ratio),  # 줄이기
-#             nn.ReLU(inplace=True),
-#             nn.Linear(in_channels // reduction_ratio, in_channels),  # 원래 크기로 돌리기
-#             nn.Sigmoid()  # 중요성을 0과 1 사이로 조정
-#         )
-
-#     def forward(self, x):
-#         # Squeeze 부분: 글로벌 평균 풀링을 통해 각 채널의 요약 정보를 생성
-#         x_squeeze = self.squeeze(x)
-#         # Excitation 부분: 요약 정보를 기반으로 각 채널의 중요성을 조정
-#         x_excitation = self.excitation(x_squeeze.view(x_squeeze.size(0), -1))
-#         # 각 채널에 중요성을 적용하여 출력 생성
-#         x_se = x * x_excitation.view(x.size(0), x.size(1), 1, 1)
-#         return x_se
-
-# StochasticDepth
 class StochasticDepth(nn.Module):
     
     def __init__(self, prob, mode):
@@ -125,13 +104,6 @@ class MBConv(nn.Module):
 # Pytorch Implementation of EfficientNetV2
 class EfficientNetV2(nn.Module):
     
-    # :arg
-    #     - layer_infos: list of MBConvConfig
-    #     - out_channels: bottleneck channel
-    #     - nlcass: number of class
-    #     - dropout: dropout probability before classifier layer
-    #     - stochastic depth: stochastic depth probability
-
     def __init__(self, layer_infos, out_channels=1280, num_class = 0, dropout=0.2, stochastic_depth=0.0,
                  block=MBConv, act_layer=nn.SiLU, norm_layer=nn.BatchNorm2d):
         super(EfficientNetV2, self).__init__()
@@ -208,8 +180,6 @@ def get_efficientnet_v2_hyperparam(model_name):
         end = 384, 480, 0.3, 15, 0.2
     elif 'efficientnet_v2_l' in model_name:
         end = 384, 480, 0.4, 20, 0.5
-    elif 'efficientnet_v2_xl' in model_name:
-        end = 384, 512, 0.4, 20, 0.5
     return Box({"init_train_size": 128, "init_dropout": 0.1, "init_randaug": 5, "init_mixup": 0,
              "end_train_size": end[0], "end_dropout": end[2], "end_randaug": end[3], "end_mixup": end[4], "eval_size": end[1]})
 
@@ -225,46 +195,14 @@ def get_efficientnet_v2_structure(model_name):
             (6, 3, 1, 128, 160, 9, True, False),
             (6, 3, 2, 160, 256, 15, True, False),
         ]
-    elif 'efficientnet_v2_m' in model_name:
-        return [
-            # e k  s  in  out xN  se   fused
-            (1, 3, 1, 24, 24, 3, False, True),
-            (4, 3, 2, 24, 48, 5, False, True),
-            (4, 3, 2, 48, 80, 5, False, True),
-            (4, 3, 2, 80, 160, 7, True, False),
-            (6, 3, 1, 160, 176, 14, True, False),
-            (6, 3, 2, 176, 304, 18, True, False),
-            (6, 3, 1, 304, 512, 5, True, False),
-        ]
-    elif 'efficientnet_v2_l' in model_name:
-        return [
-            # e k  s  in  out xN  se   fused
-            (1, 3, 1, 32, 32, 4, False, True),
-            (4, 3, 2, 32, 64, 7, False, True),
-            (4, 3, 2, 64, 96, 7, False, True),
-            (4, 3, 2, 96, 192, 10, True, False),
-            (6, 3, 1, 192, 224, 19, True, False),
-            (6, 3, 2, 224, 384, 25, True, False),
-            (6, 3, 1, 384, 640, 7, True, False),
-        ]
-    elif 'efficientnet_v2_xl' in model_name:
-        return [
-            # e k  s  in  out xN  se   fused
-            (1, 3, 1, 32, 32, 4, False, True),
-            (4, 3, 2, 32, 64, 8, False, True),
-            (4, 3, 2, 64, 96, 8, False, True),
-            (4, 3, 2, 96, 192, 16, True, False),
-            (6, 3, 1, 192, 256, 24, True, False),
-            (6, 3, 2, 256, 512, 32, True, False),
-            (6, 3, 1, 512, 640, 8, True, False),
-        ]
 
-num_class = 10
+
+num_class = 100
 def efficientnet_v2(model_name, num_class):
     residual_config = [MBConvConfig(*layer_config) for layer_config in get_efficientnet_v2_structure(model_name)]
     model = EfficientNetV2(residual_config, 1280, num_class, dropout=0.1, stochastic_depth=0.2, block=MBConv, act_layer=nn.SiLU)
     efficientnet_v2_init(model)
-    load_from_zoo(model,model_name)
+    # load_from_zoo(model,model_name)  #pretrain model load
     return model
 
 def efficientnet_v2_s(num_class): 
